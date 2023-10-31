@@ -17,8 +17,56 @@ from open_clip.coca_model import CoCa
 from open_clip.openai import load_openai_model
 from open_clip.pretrained import list_pretrained_tags_by_model, download_pretrained_from_hf
 from open_clip.transform import image_transform
+import shutil
+import random
+import fcntl  # 用于文件锁
 HF_HUB_PREFIX = 'hf-hub:'
 
+def generate_test_set(dataset_path, total_test_set_size):
+    grandparent_dir = os.path.abspath(os.path.join(dataset_path, os.pardir, os.pardir))
+    root_dir = os.path.abspath(os.path.join(grandparent_dir, os.pardir))
+    dataset_name = os.path.basename(dataset_path)
+    test_set_path = os.path.join(root_dir, "test_set")
+    test_set_path = os.path.join(test_set_path, dataset_name)
+
+    # 获取每个类别的图像数量
+    category_image_counts = {}
+    for category in os.listdir(dataset_path):
+        category_path = os.path.join(dataset_path, category)
+        if os.path.isdir(category_path):
+            image_files = [f for f in os.listdir(category_path) if f.endswith(".jpg")]
+            category_image_counts[category] = len(image_files)
+
+    # 计算每个类别在测试集中应有的图像数量
+    test_set_image_counts = {}
+    total_images = sum(category_image_counts.values())
+    for category, count in category_image_counts.items():
+        test_set_image_counts[category] = int(total_test_set_size * count / total_images)
+
+    # 从每个类别中复制相应数量的图像到测试集
+    for category in os.listdir(dataset_path):
+        category_path = os.path.join(dataset_path, category)
+        if os.path.isdir(category_path):
+            image_files = [f for f in os.listdir(category_path) if f.endswith(".jpg")]
+            # 创建测试集目录
+            test_category_path = os.path.join(test_set_path, category)
+            os.makedirs(test_category_path, exist_ok=True)
+
+            # 将选定的图像复制到测试集目录
+            test_set_size_for_category = test_set_image_counts[category]
+            for image in image_files[:test_set_size_for_category]:
+                source_path = os.path.join(category_path, image)
+                destination_path = os.path.join(test_category_path, image)
+                try:
+                    # 复制图像文件
+                    shutil.copyfile(source_path, destination_path)
+                except IOError as e:
+                    # 文件已存在，跳过
+                    print(f"Skipping {destination_path} as it already exists.")
+                    continue
+
+
+    return test_set_path
 def create_model(
         model_name: str,
         pretrained: Optional[str] = None,
@@ -179,7 +227,7 @@ def create_model(
 
     
     
-def inference(args) -> Tuple[List[int], List[int], List[str]]:
+def inference(args,test_set_path) -> Tuple[List[int], List[int], List[str]]:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = create_model(args.model_name, pretrained_path=args.model_path, pretrained='laion2b_s34b_b79k')
     #model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k',device=device)
@@ -192,15 +240,24 @@ def inference(args) -> Tuple[List[int], List[int], List[str]]:
         std=image_std,
     )
     tokenizer = open_clip.get_tokenizer(args.model_name)
-    dataset_path = args.dataset_path # 替换为数据集路径
+    dataset_name = os.path.basename(args.dataset_path)
+    dataset_path = test_set_path # 替换为测试集路径
     all_labels = []   #所有输入数据的标签
     unique_labels = [] #数据集中所有类别
+    all_prompt = []
+    current_file_path = os.path.abspath(__file__)
+    parent_directory = os.path.dirname(current_file_path)
+    grandparent_directory = os.path.dirname(parent_directory)
+    template_file_path=os.path.join(grandparent_directory, 'template')
+    template_path=os.path.join(template_file_path, 'dataset_template.json')
+    with open(template_path, 'r') as f:
+       dataset_templates = json.load(f)
 #处理输入数据集
     class CustomDataset(Dataset):
-      def __init__(self, dataset_path, preprocess_fn):
+      def __init__(self, dataset_path,dataset_name, preprocess_fn):
         self.processed_dataset = []
         self.label_idx_counter = 0
-
+        self.dataset_templates = dataset_templates.get(dataset_name, [])
         for label in os.listdir(dataset_path):
             label_path = os.path.join(dataset_path, label)
             if label == '.DS_Store':
@@ -211,9 +268,13 @@ def inference(args) -> Tuple[List[int], List[int], List[str]]:
 
                     image = preprocess_fn(Image.open(image_path)).to(device)
                     all_labels.append(label)
+                    # 生成相应的 prompt
+                    for template in self.dataset_templates:
+                      prompt = template.format(c=label)
+                      all_prompt.append(prompt) 
                     processed_sample = {
                         "image": image,
-                        "label": self.label_idx_counter
+                        "label": self.label_idx_counter,
                     }
 
                     self.processed_dataset.append(processed_sample)
@@ -225,13 +286,14 @@ def inference(args) -> Tuple[List[int], List[int], List[str]]:
         return {"image": self.processed_dataset[idx]["image"], "label": self.processed_dataset[idx]["label"]}
 
 #将输入数据处理为Dataset类型 
-    custom_dataset = CustomDataset(dataset_path, preprocess)
+    custom_dataset = CustomDataset(args.dataset_path,dataset_name, preprocess)
 #将Dataset转为Dataloader并设置batch_size
     test_data = DataLoader(custom_dataset,batch_size=128,shuffle=False)
 #将所有输入图片的label存放在all_labels再去重
     unique_labels =  list(OrderedDict.fromkeys(all_labels))
 #去重后作为text_prompt
-    text_prompt = tokenizer(unique_labels).to(device)
+    unique_prompt = list(OrderedDict.fromkeys(all_prompt))
+    text_prompt = tokenizer(unique_prompt).to(device)
 # 遍历batch进行预测
     true_labels = []
     predicted_labels = []
@@ -261,20 +323,45 @@ if __name__ == "__main__":
     parser.add_argument("--model_name", type=str, default="ViT-B-32", help="Model name")
     parser.add_argument("--model_path", type=str, default=None, help="Path to the model weights")
     parser.add_argument("--dataset_path", type=str, default=None, help="Path to the dataset")
-    parser.add_argument("--true_labels_output_path", type=str, default=None, help="Path to the true_labels_output")
-    parser.add_argument("--predicted_labels_output_path", type=str, default=None, help="Path to the predicted_labels_output")
-    parser.add_argument("--unique_labels_output_path", type=str, default=None, help="Path to the unique_labels_output")
     args = parser.parse_args()
+
+      # 生成测试集
+    if args.dataset_path is not None:
+        total_test_set_size = 5000  # 测试集大小
+        test_set_path =generate_test_set(args.dataset_path, total_test_set_size)
+
      # 调用 inference 函数获取结果
-    true_labels, predicted_labels, unique_labels = inference(args)
+    true_labels, predicted_labels, unique_labels = inference(args, test_set_path)
     # 将结果保存为三个 CSV 文件
     true_labels_df = pd.DataFrame({"true_labels": true_labels})
     predicted_labels_df = pd.DataFrame({"predicted_labels": predicted_labels})
     unique_labels_df = pd.DataFrame({"unique_labels": unique_labels})
 
-    true_labels_csv_path = args.true_labels_output_path  # 指定保存路径和文件名
-    predicted_labels_csv_path = args.predicted_labels_output_path # 指定保存路径和文件名
-    unique_labels_csv_path = args.unique_labels_output_path  # 指定保存路径和文件名
+    # 提取 model_path 和 dataset_path 的最后一部分
+    if args.model_path is not None:
+      model_name_with_extension = os.path.basename(args.model_path)
+      model_name, extension = os.path.splitext(model_name_with_extension)
+    else:
+      model_name = "default_model"
+
+    if args.dataset_path is not None:
+      dataset_name = os.path.basename(args.dataset_path)
+    else:
+      dataset_name = "default_dataset"
+      
+    # 获取当前脚本所在文件夹的路径
+    current_script_path = os.path.dirname(os.path.abspath(__file__))
+
+    # 获取上一级的路径
+    parent_path = os.path.dirname(current_script_path)
+    intermediate = os.path.join(parent_path,"intermediate")
+    intermediate_path = os.path.join(intermediate, f"{model_name}_{dataset_name}")
+    os.makedirs(intermediate_path, exist_ok=True)
+
+
+    true_labels_csv_path = os.path.join(intermediate_path,"true_labels.csv") # 指定保存路径和文件名
+    predicted_labels_csv_path = os.path.join(intermediate_path,"predicted_labels.csv")# 指定保存路径和文件名
+    unique_labels_csv_path = os.path.join(intermediate_path,"unique_labels.csv") # 指定保存路径和文件名
 
     true_labels_df.to_csv(true_labels_csv_path, index=False)
     predicted_labels_df.to_csv(predicted_labels_csv_path, index=False)
