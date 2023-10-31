@@ -1,8 +1,13 @@
 使用说明  
 ========  
-存放路径
+说明
 -------------          
-run.sh、inference.py、evaluate.py、compare.py存放至open_clip-main的**一级目录下**  
+scripts文件夹存放至**一级目录下**    
+模型参数保存在models文件夹   
+分类任务的数据集保存在data/clsf  
+测试集会自动生成在test_set目录下  
+中间结果保存在intermediate下  
+最终结果保存在results下  
 
 参数修改
 -------
