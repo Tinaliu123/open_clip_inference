@@ -1,1 +1,12 @@
-
+{"EuroSAT_RGB": [
+    "a centered satellite photo of {c}.",
+    "a centered satellite photo of a {c}.",
+    "a centered satellite photo of the {c}."
+],
+"RESISC45": [
+    "a sattelite image of {c}",
+    "an aerial view of {c}",
+    "a sattelite photo of {c}",
+    "{c} from above"
+]
+}
