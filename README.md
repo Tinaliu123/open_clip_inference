@@ -9,6 +9,7 @@ scripts下包含所有的脚本文件
 中间结果保存在intermediate下  
 最终结果保存在results下  
 
+##config下保存了数据集的json格式信息
 参数修改
 -------
 打开run.sh  
