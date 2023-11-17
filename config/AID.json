@@ -1,0 +1,9 @@
+{"name":"AID",
+"size":600.0,
+"task":"classification",
+"classes":"airport, bare land, baseball field, beach, bridge, center, church, commercial, dense residential, desert, farmland, forest, industrial, meadow, medium residential, mountain, park, parking, playground, pond, port, railway station, resort, river, school, sparse residential, square, stadium, storage tanks, viaduct",
+"total number":10000.0,
+"resolution":0.5,
+"Geographic information":"none",
+"isDownload":"yes"}
+

@@ -1,0 +1,9 @@
+{"name":"HRSC2016",
+"size":"300*300-1500*900",
+"task":"OD",
+"classes":"aircraft carrier,warcraft,merchant ship",
+"subclasses":"Nimitz class aircraft carrier,Enterprise class aircraft carrier,Kitty Hawk class aircraft carrier,Admiral Kuznetsov aircraft carrier,Ford-class aircraft carriers,Midway-class aircraft carrier,Invincible-class aircraft carrier,Arleigh Burke class destroyers,WhidbeyIsland class landing craft,Perry class frigate,Sanantonio class amphibious transport dock,Ticonderoga class cruiser,Abukuma-class destroyer escort,Austen class amphibious transport dock,Tarawa-class amphibious assault ship,USS Blue Ridge (LCC-19),Command ship A,Warcraft A,Medical ship,,,Container ship,Car carrier A,Hovercraft,yacht,Container ship A,Cruise ship,Car carrier B",
+"total number":1061.0,
+"resolution":"2-0.4",
+"Geographic information":"none",
+"isDownload":"yes"}
