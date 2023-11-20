@@ -1,0 +1,1 @@
+{"name":"EuroSAT","size":64,"task":"classification","classes":"AnnualCrop,Forest,HerbaceousVegetation,Highway,Industrial,Pasture,PermanentCrop,Residential,River,SeaLake","total number":27000,"resolution":10,"Geographic information":"yes","isDownload":"yes"}
