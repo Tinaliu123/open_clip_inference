@@ -8,7 +8,8 @@ scripts下包含所有的脚本文件
 测试集会自动生成在test_set目录下  
 中间结果保存在intermediate下  
 最终结果保存在results下    
-config下保存了数据集的json格式信息        
+config下保存了数据集的json格式信息   
+辣条大王汪汪汪
 
 
 参数修改
